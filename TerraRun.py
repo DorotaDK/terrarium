@@ -1,42 +1,50 @@
 import RPi.GPIO as GPIO
-import Adafruit_DHT
-import pickle
+import MySQLdb as mdb
+import TerraFunc as TF
+from w1thermsensor import W1ThermSensor
 from TerraInit import pinyGrzalek, pinyCzujnikow, pinyWiatrakow, pinyZraszaczy
-from TerraCore import Terrarium
+
 GPIO.setmode(GPIO.BCM)
 
-czytaj = open('Terraria.txt', 'rb')
-ilosc_terrariow = pickle.load(czytaj)
-listaTerrariow = []
-for n in range(ilosc_terrariow):
-    listaTerrariow.append(n)
+ilosc_terrariow = TF.liczTerraria()
 
-portyGrzalek = dict(zip(listaTerrariow, pinyGrzalek))
-portyCzujnikow = dict(zip(listaTerrariow, pinyCzujnikow))
-portyWiatrakow = dict(zip(listaTerrariow, pinyWiatrakow))
-portyZraszaczy = dict(zip(listaTerrariow, pinyZraszaczy))
+zakresNumerow = range(1, ilosc_terrariow+1)
+portyGrzalek = dict(zip(zakresNumerow, pinyGrzalek))
+portyCzujnikow = dict(zip(zakresNumerow, pinyCzujnikow))
+portyWiatrakow = dict(zip(zakresNumerow, pinyWiatrakow))
+portyZraszaczy = dict(zip(zakresNumerow, pinyZraszaczy))
 
-for i in listaTerrariow:
-    if portyCzujnikow.get(i) == None:
-        break
+odczytyCzujnikow = {} # Słownik z odczytami temperatury dla każdego terrarium
+for sensor in W1ThermSensor.get_available_sensors():
+    odczytyCzujnikow[sensor.id] = sensor.get_temperature()
+
+for t in range(ilosc_terrariow):
+    if portyCzujnikow.get(t) is None:  # Wyłuskanie portu ze słownika na podstawie numeru terrarium
+        break  # jeśli terrarium nie ma czujnika to przerywa pętlę
     else:
-        wilg, temp = Adafruit_DHT.read_retry(11, portyCzujnikow.get(i))
-        terrarium = pickle.load(czytaj)
-        terrarium.odczytWilgotnosci(zwilg)
-        terrarium.odczytTemperatury(ztemp)
-        print(wilg, temp)
-        if portyWiatrakow.get(i) == None:
+        temperatura = odczytyCzujnikow.get(portyCzujnikow.get(t))  # odczytywanie temperatury z danego czujnika
+
+        if portyWiatrakow.get(t) is None:
             break
-        elif portyGrzalek.get(i) == None:
-            if portyZraszaczy.get(i) == None:
+        elif portyGrzalek.get(t) is None:
+            if portyZraszaczy.get(t) is None:
                 break
-            else:
-                terrarium.regulacjaWilgotnosci(portyZraszaczy.get(i), portyWiatrakow.get(i))
-        elif portyZraszaczy.get(i) == None:
-            if portyGrzalek.get(i) == None:
+            else:  # nie mamy grzałki, ale mamy wiatrak i zraszacz - regulujemy wilgotność
+                GPIO.setup(portyZraszaczy.get(t), GPIO.OUT)
+                GPIO.setup(portyWiatrakow.get(t), GPIO.OUT)
+                # TF.regulacjaWilgotnosci(t, wilgotnosc, portyZraszaczy.get(t), portyWiatrakow.get(t))
+        elif portyZraszaczy.get(t) is None:
+            if portyGrzalek.get(t) is None:
                 break
-            else:
-                terrarium.regulacjaTemperatury(portyGrzalek.get(i), portyWiatrakow.get(i))
-        else:
-            terrarium.regulacjaTemperatury(portyGrzalek.get(i), portyWiatrakow.get(i))
-            terrarium.regulacjaWilgotnosci(portyZraszaczy.get(i), portyWiatrakow.get(i))
+            else:  # nie mamy zraszacza, ale mamy grzałkę i wiatrak - regulujemy temperaturę
+                GPIO.setup(portyGrzalek.get(t), GPIO.OUT)
+                GPIO.setup(portyWiatrakow.get(t), GPIO.OUT)
+                stanGrzalki = TF.regulacjaTemperatury(t, temperatura, portyGrzalek.get(t), portyWiatrakow.get(t))
+                TF.zapiszPomiar(t, temperatura, stanGrzalki)
+        else:  # mamy cały sprzęt, regulujemy wilgotność i temperaturę
+            GPIO.setup(portyZraszaczy.get(t), GPIO.OUT)
+            GPIO.setup(portyWiatrakow.get(t), GPIO.OUT)
+            GPIO.setup(portyGrzalek.get(t), GPIO.OUT)
+            stanGrzalki = TF.regulacjaTemperatury(t, temperatura, portyGrzalek.get(t), portyWiatrakow.get(t))
+            TF.zapiszPomiar(t, temperatura, stanGrzalki)
+            # TF.regulacjaWilgotnosci(t, wilgotnosc, portyZraszaczy.get(t), portyWiatrakow.get(t))

@@ -1,32 +1,40 @@
 pinyGrzalek = [2]
-pinyCzujnikow = [27]
+pinyCzujnikow = [27] #id czujników
 pinyWiatrakow = [3]
-pinyZraszaczy = [4]
+pinyZraszaczy = []
+host = 'localhost'
+user = 'Guest'
+password = 'password'
+database = 'terraria'
+
 
 def main():
-	import RPi.GPIO as GPIO
-	from TerraCore import Terrarium
-	import pickle
-	plik = open('Terraria.txt', 'wb')
-	ile_terrariow = int(input("Witaj, ile chcesz dodac terrariow?\n"))
-	pickle.dump(ile_terrariow, plik)
-	for i in range(ile_terrariow):
-	    terrarium = Terrarium()
-	    terrarium.ustawNumer_Terrarium()
-	    terrarium.ustawNazwe()
-	    terrarium.ustawTemperatura()
-	    terrarium.ustawWilgotnosc()
-	    terrarium.wypisz_dane()
-	    terrarium.wypisz_temp()
-	    terrarium.wypisz_wilg()
-	    pickle.dump(terrarium, plik)
-	plik.close()
-	
-	GPIO.setwarnings(False)
-	
-	GPIO.cleanup()
-	GPIO.setmode(GPIO.BCM)
-	
-if __name__=='__main__':
-	main()	
+    import MySQLdb as mdb
+    import RPi.GPIO as GPIO
+    ile_terrariow = int(input("Witaj, ile chcesz dodac terrariow?\n"))
+    try:
+        dbConnection = mdb.connect(host, user, password, database)
+        with dbConnection:
+            for i in range(ile_terrariow):
+                imie = input("Podaj imię pupila: ")
+                temperatura = input("Ustaw Temperature: ")
+                wahanie = input("Ustaw maksymalne odchylenie: ")
 
+                dbCursor = dbConnection.cursor()
+                dbCursor.execute(
+                    "INSERT INTO zwierzeta (imie, temperatura, wahanie) VALUES ({0}, {1}, {2})".format(imie,
+                                                                                                       temperatura,
+                                                                                                       wahanie))
+    except mdb.Error as e:
+        print("Error %d: %s".format(e.args[0], e.args[1]))
+    finally:
+        if dbConnection:
+            dbConnection.close()
+
+    GPIO.setwarnings(False)
+    GPIO.cleanup()
+    GPIO.setmode(GPIO.BCM)
+
+
+if __name__ == '__main__':
+    main()
