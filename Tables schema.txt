@@ -1,0 +1,19 @@
+CREATE TABLE zwierzeta (
+id INT NOT NULL AUTO_INCREMENT,
+imie VARCHAR(15) NOT NULL,
+temperatura FLOAT NOT NULL,
+wahanie FLOAT NOT NULL,
+PRIMARY KEY (id)
+);
+
+CREATE TABLE pomiary (
+id_pomiaru INT NOT NULL AUTO_INCREMENT,
+id INT,
+pomiar FLOAT,
+stan_grzalki BOOLEAN,
+czas TIMESTAMP,
+PRIMARY KEY (id_pomiaru),
+FOREIGN KEY (id)
+REFERENCES szczeniaczki(id) 
+ON DELETE CASCADE
+);
